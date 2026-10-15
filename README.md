@@ -14,7 +14,7 @@ Provider outages are guaranteed. User-facing errors are optional.
 
 ## Status
 
-Scaffolded. Concept notes and the first implementation are in progress; results land in `results/` once the GPU runs are done.
+Concept primer written (`CONCEPTS.md`). The gateway is next; it is developed against mock providers and validated once against a real vLLM replica.
 
 ## Layout
 

@@ -54,7 +54,9 @@ python -m venv .venv && source .venv/bin/activate && pip install -e ".[dev]" && 
 
 ## Validation against a real provider
 
-One run with a vLLM replica as the first provider (and mocks as fallbacks) is part of the chaos project (14), which breaks the replica on purpose and watches this gateway's breaker react.
+Done in [inferchaos](https://github.com/NomanJafar/inferchaos) (run 4, 18 Oct 2026): a real vLLM replica on a T4 as the first provider, a mock as the fallback, 4 req/s. The replica was killed mid-load and restarted: **0 user-visible errors** out of 1,827 requests, the error-rate breaker opened 5.1 s after the kill, retries and fallbacks covered the 60 s fault window with zero SLO misses, and the breaker's half-open probe put traffic back on the replica 14 s after it came back. The same run showed the breaker's TTFT rule opening on a *freshly started* replica whose first requests took 3.5 s (Triton JIT compilation): the gateway treated a cold replica as a sick one, which is correct behaviour and an argument for warming a replica before admitting it to the chain. Full timeline and plot in inferchaos's README.
+
+The mock-fault suite in the same project found one bug here: the TTFT response header reported the successful attempt's time (40 ms on the fallback) rather than the user's end-to-end wait (1.6 s on the throttled provider). It is now end-to-end, with the per-attempt figure in a separate header.
 
 ## Not included
 

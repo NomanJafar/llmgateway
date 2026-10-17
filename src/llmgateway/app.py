@@ -195,13 +195,17 @@ def create_app(cfg: GatewayConfig) -> FastAPI:
             ra = limiter.retry_after(tenant, now())
             return JSONResponse({"error": "rate limited", "tenant": tenant}, status_code=429, headers={"retry-after": f"{ra:.3f}"})
         body = await request.json()
+        t_req = now()
         attempt, name, attempts, errors = await try_chain(body)
         if attempt is None:
             counters[("chain_exhausted", "")] += 1
             return JSONResponse({"error": "all providers failed", "attempts": attempts, "errors": errors}, status_code=502,
                                 headers={"x-llmgateway-attempts": str(attempts)})
+        # User-facing TTFT runs from request arrival and includes retries and failed attempts;
+        # the breaker uses the per-attempt TTFT (provider health), recorded inside try_chain.
         headers = {"x-llmgateway-provider": name, "x-llmgateway-attempts": str(attempts),
-                   "x-llmgateway-ttft-ms": f"{(attempt.ttft_s or 0) * 1000:.1f}"}
+                   "x-llmgateway-ttft-ms": f"{(now() - t_req) * 1000:.1f}",
+                   "x-llmgateway-attempt-ttft-ms": f"{(attempt.ttft_s or 0) * 1000:.1f}"}
 
         async def gen():
             try:

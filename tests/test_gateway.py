@@ -86,3 +86,13 @@ def test_concurrent_streams_do_not_cross(providers, live_gateway):
                 rs = await asyncio.gather(*[c.post("/v1/chat/completions", json=_body(max_tokens=n)) for n in (2, 5, 9)])
                 return [r.json()["usage"]["completion_tokens"] for r in rs]
         assert asyncio.run(go()) == [2, 5, 9]
+
+
+def test_reported_ttft_is_end_to_end_including_failed_attempts(providers, live_gateway):
+    # A throttled first provider times out at 100 ms and the healthy one answers in ~5 ms; the user
+    # waited ~105 ms, and that is what the header must say (the breaker still sees per-attempt TTFT).
+    cfg = _cfg(providers, ["slow", "healthy"], first_token_timeout_ms=100)
+    with live_gateway(create_app(cfg)) as url:
+        r = httpx.post(f"{url}/v1/chat/completions", json=_body(), timeout=30)
+        assert r.headers["x-llmgateway-provider"] == "healthy"
+        assert float(r.headers["x-llmgateway-ttft-ms"]) >= 100
